@@ -1,14 +1,13 @@
 {
-  "name": "mq-sample-app",
+  "name": "mq-pillar-three",
   "version": "1.0.0",
-  "description": "Test MQ",
+  "description": "Test MQ - Pillar Three",
   "author": "Per Thoresson per@thoresson.com.au",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "amqplib": "^0.5.2",
     "express": "^4.16.1",
     "rabbitmq-node": "^0.5.0"
   },
