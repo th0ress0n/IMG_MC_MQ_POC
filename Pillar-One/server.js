@@ -1,28 +1,41 @@
 'use strict';
 
-const express = require('express');
+var express = require('express')
+var app = express();
+var server = require('http').Server(app);
+var io = require('socket.io')(server);
+
 const RabbitMQ = require('rabbitmq-node');
 
-var routing = require('../common/routing');
-var queues = require('../common/queues');
+var routing = require('./common/routing');
+var queues = require('./common/queues');
 
-// Constants
-const PORT = 8080;
 const HOST = '0.0.0.0';
+var PORT = process.env.PORT || 8080;
+server.listen(PORT);
 
-// App
-const app = express();
-app.get('/', (req, res) => {
-  res.send('Pillar One Started......\n'+routing.EVT_HEARTBEAT);
+app.use("/css", express.static(__dirname + '/css'));
+app.use("/lib", express.static(__dirname + '/lib'));
+app.use("/img", express.static(__dirname + '/img'));
+
+app.get('/', function (req, res) {
+  res.sendFile(__dirname + '/index.html');
 });
 
-app.listen(PORT, HOST);
-console.log(`Running on http://${HOST}:${PORT}`);
+io.on('connection', function (socket) {
+  socket.emit('init', { message: 'client init' });
+  
+  socket.on('init_callback', function (data) {
+    console.log(data);
+  });
 
-var rabbitmq = new RabbitMQ('amqp://0.0.0.0');
+});
+
+var rabbitmq = new RabbitMQ('amqp://'+HOST);
 
 rabbitmq.on('message', function(channel, message) {
-  console.log(message);
+  console.log("P1 "+message.toString());
+  io.sockets.volatile.emit('add_message', { message: message.toString() } );
   rabbitmq.publish(queues.XPKIT_ANALYTICS, {message: 'P1 received '+message+' on channel '+channel});
 });
 
@@ -35,3 +48,4 @@ rabbitmq.on('logs', function(print_log) {
 });
 
 rabbitmq.subscribe(queues.SCREEN_CORE);
+

@@ -1,33 +1,42 @@
 'use strict';
 
-const express = require('express');
+var express = require('express')
+var app = express();
+var server = require('http').Server(app);
+var io = require('socket.io')(server);
+
 const RabbitMQ = require('rabbitmq-node');
 
-var routing = require('../common/routing');
-var queues = require('../common/queues');
+var routing = require('./common/routing');
+var queues = require('./common/queues');
+
+const HOST = '0.0.0.0';
+var PORT = process.env.PORT || 8080;
+server.listen(PORT);
+
+app.use("/css", express.static(__dirname + '/css'));
+app.use("/lib", express.static(__dirname + '/lib'));
+app.use("/img", express.static(__dirname + '/img'));
+
+app.get('/', function (req, res) {
+  res.sendFile(__dirname + '/index.html');
+});
+
+io.on('connection', function (socket) {
+  socket.emit('init', { message: 'client init' });
+  
+  socket.on('init_callback', function (data) {
+    console.log(data);
+  });
+
+});
 
 var rabbitmq = new RabbitMQ('amqp://0.0.0.0');
 
-// Constants
-const PORT = 8080;
-const HOST = '0.0.0.0';
-
-// App
-const app = express();
-app.get('/', (req, res) => {
-  res.send('Core Started......\n');
-});
-
-app.listen(PORT, HOST);
-console.log(`Running on http://${HOST}:${PORT}`);
-
-
-
 rabbitmq.on('message', function(channel, message) {
-  console.log(message);
-  // if(message==queues.XPKIT_ANALYTICS){
-  // 	// log to screen
-  // }
+  console.log("Core "+message.toString());
+  io.sockets.volatile.emit('add_message', { message: message.toString() } );
+  rabbitmq.publish(queues.XPKIT_ANALYTICS, {message: 'Core received '+message+' on channel '+channel});
 });
 
 rabbitmq.on('error', function(err) {
@@ -38,9 +47,21 @@ rabbitmq.on('logs', function(print_log) {
   console.info(print_log);
 });
 
+
+function intervalFunc() {
+	console.log("interval tick ");
+	io.sockets.volatile.emit('add_message', { message: "Interval tick" } );
+  	rabbitmq.publish(queues.SCREEN_CORE, {message: 'tick'});
+}
+
+setInterval(intervalFunc, 2000);
+
 rabbitmq.subscribe(queues.SCREEN_KNOWLEDGE);
 rabbitmq.subscribe(queues.SCREEN_COMMUNITY);
 rabbitmq.subscribe(queues.SCREEN_LIFE);
 rabbitmq.subscribe(queues.SCREEN_FUTURE);
 rabbitmq.subscribe(queues.XPKIT_ANALYTICS);
-// rabbitmq.publish(queues.SCREEN_CORE, {message: 'Hello World'});
+rabbitmq.subscribe(queues.SCREEN_CORE);
+rabbitmq.publish(queues.SCREEN_CORE, {message: 'Hello World'});
+
+
